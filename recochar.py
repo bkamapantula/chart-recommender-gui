@@ -9,22 +9,6 @@ def getFromDict(dataDict, mapList):
     return reduce(operator.getitem, mapList, dataDict)
 
 
-type_recognizer = {
-    'numerical': {
-        'categorical': 'num_and_cat',
-        'time_series': 'several_series'
-    },
-    'categorical': {
-        'numerical': 'num_and_cat',
-    },
-    'num_and_cat': {
-        'time_series': 'time_series',
-    },
-    'time_series': {
-        'time_series': 'several_series'
-    }
-}
-
 chart_possible = {
     'coltype_combination':
     {
@@ -70,7 +54,9 @@ chart_possible = {
         'categorical': {
             'one_cat': ['barplot', 'lollipop', 'donut', 'treemap', 'circlepack'],
             'several_cat': {
-
+                'nested': [],
+                'subgroup': [],
+                'adjacency': []
             }
         }
     }
@@ -78,9 +64,23 @@ chart_possible = {
 
 
 def initiate(handler):
+
+    # dataframe must have at least one column in it. TODO: Tejesh to write a null check
     df = gramex.cache.open('flags.xlsx')
     print(df.head())
 
+
+    pivot_df = None
+    # if len(df.select_dtypes(include=['number']).columns) > 4 or handler.args.pivot == True:
+    #     pivot_df = df.pivot()
+
+    charts_recommended = recommender(pivot_df or df)
+
+    return charts_recommended
+
+
+
+def recommender(df):
     # BFS but will go further down only if certain condition is possible
     # So, a node is pushed to the BFS
     queue = []
@@ -89,15 +89,18 @@ def initiate(handler):
 
     for key in chart_possible:
         queue.append(key)
+        visited_nodes_path.append(key)
 
     while len(queue) > 0:
         if type(getFromDict(chart_possible, visited_nodes_path)) == 'list':   # headsup: you are at leaf node
             charts_recommended.append(getFromDict(chart_possible, visited_nodes_path))
         else:
-            visited_node = queue.pop(0)
-            next_node = exec(visited_node)
+            node_visited = queue.pop(0)
+            next_node = exec(node_visited + '(df)')
             queue.append(next_node)
             visited_nodes_path.append(next_node)
+
+    return charts_recommended
 
 
 def coltype_combination(df):
@@ -121,7 +124,12 @@ def coltype_combination(df):
 
 
 def num_and_cat(df):
-    return 'one_num_one_cat'
+    if len(df.columns) == 2 and len(df.select_dtypes(include=['number']).columns) == 1:
+        return 'one_num_one_cat'
+    elif len(df.select_dtypes(exclude=['number']).columns) == 1:
+        return 'one_cat_several_num'
+    else:
+        return 'several_cat_one_num'
 
 
 def one_num_one_cat(df):
@@ -134,13 +142,12 @@ def one_obs_per_group(df):
 
 
 def one_cat_several_num(df):
-
     return 'one_value_per_group' if one_value_per_group(df) else 'multiple_values_per_group'
 
 
 def one_value_per_group(df):
-    one_cat = df.select_dtypes(exclude=['number'])[0]
-    return df[one_cat].unique().count() == df[one_cat].count()
+    one_cat_df = df.select_dtypes(exclude=['number'])
+    return one_cat_df.unique().count() == one_cat_df.count()
 
 
 def multiple_values_per_group(df, one_cat):
