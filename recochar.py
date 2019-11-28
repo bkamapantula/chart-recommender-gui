@@ -15,7 +15,7 @@ chart_possible = {
         'num_and_cat': {
             'one_num_one_cat': {
                 'one_obs_per_group': ['lollipop', 'bar_plot', 'circular_bar_plot', 'treemap', 'circlepack'],
-                'several_obs_per_group': ['box_plot', 'violin_plot', 'circular_bar_plot', 'treemap', 'circlepack']
+                'several_obs_per_group': ['box_plot', 'violin_plot']
             },
             'one_cat_several_num': { # NOTE: Could not understand rationale behind no_order, a_num_is_ordered in data-to-viz.com
                 'one_value_per_group': ['multi_line', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
@@ -73,6 +73,7 @@ def initiate(handler):
     pivot_df = None
     # if len(df.select_dtypes(include=['number']).columns) > 4 or handler.args.pivot == True:
     #     pivot_df = df.pivot()
+    df = df[['ID', 'c1']]
 
     charts_recommended = recommender(pivot_df or df)
 
@@ -92,15 +93,18 @@ def recommender(df):
         visited_nodes_path.append(key)
 
     while len(queue) > 0:
-        if type(getFromDict(chart_possible, visited_nodes_path)) == 'list':   # headsup: you are at leaf node
-            charts_recommended.append(getFromDict(chart_possible, visited_nodes_path))
+        if isinstance(getFromDict(chart_possible, visited_nodes_path), list):   # headsup: you are at leaf node
+            charts_recommended.extend(getFromDict(chart_possible, visited_nodes_path))
+            print(charts_recommended)
+            break
         else:
             node_visited = queue.pop(0)
-            next_node = exec(node_visited + '(df)')
-            queue.append(next_node)
-            visited_nodes_path.append(next_node)
+            loc = {}
+            exec('loc["next_node"] = '+node_visited+'(df)', globals(), locals())
+            queue.append(loc['next_node'])
+            visited_nodes_path.append(loc['next_node'])
 
-    return charts_recommended
+    return {'chart_list': charts_recommended}
 
 
 def coltype_combination(df):
@@ -147,7 +151,8 @@ def one_cat_several_num(df):
 
 def one_value_per_group(df):
     one_cat_df = df.select_dtypes(exclude=['number'])
-    return one_cat_df.unique().count() == one_cat_df.count()
+    col_name = one_cat_df.columns[0]
+    return one_cat_df[col_name].unique().size == one_cat_df[col_name].size
 
 
 def multiple_values_per_group(df, one_cat):
