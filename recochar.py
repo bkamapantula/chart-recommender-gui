@@ -23,14 +23,14 @@ chart_possible = {
             },
             'several_cat_one_num': {
                 'subgroup': {
-
+                    'one_obs_per_group': ['multi_line', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
+                    'several_obs_per_group': ['box_plot', 'violin_plot']
                 },
                 'nested': {
-
+                    'one_obs_per_group': ['lollipop', 'bar_plot', 'circular_bar_plot', 'treemap', 'circlepack'],
+                    'several_obs_per_group': ['box_plot', 'violin_plot']
                 },
-                'adjacency': {
-
-                }
+                'adjacency': ['network', 'sankey', 'chord', 'arc']
             }
         },
         'numerical': {
@@ -73,7 +73,7 @@ def initiate(handler):
     pivot_df = None
     # if len(df.select_dtypes(include=['number']).columns) > 4 or handler.args.pivot == True:
     #     pivot_df = df.pivot()
-    df = df[['ID', 'c1']]
+    df = df[['c1', 'c2']]
 
     charts_recommended = recommender(pivot_df or df)
 
@@ -95,7 +95,6 @@ def recommender(df):
     while len(queue) > 0:
         if isinstance(getFromDict(chart_possible, visited_nodes_path), list):   # headsup: you are at leaf node
             charts_recommended.extend(getFromDict(chart_possible, visited_nodes_path))
-            print(charts_recommended)
             break
         else:
             node_visited = queue.pop(0)
