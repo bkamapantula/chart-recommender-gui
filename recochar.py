@@ -6,6 +6,7 @@ from functools import reduce  # forward compatibility for Python 3
 
 
 def getFromDict(dataDict, mapList):
+    print(mapList)
     return reduce(operator.getitem, mapList, dataDict)
 
 
@@ -38,25 +39,25 @@ chart_possible = {
             'two_num': {
                 'not_ordered': {
                     'few_points': ['facet_box_plot', 'scatterplot'],
-                    'many_points': ['facet_violin_plot', 'facet_densityplot', ]
+                    'many_points': ['facet_violin_plot', 'facet_densityplot']
                 },
                 'ordered': ['line_chart', 'area_chart', 'connected_scatterplot']
             },
             'three_num': {
-                'not_ordered': [],
-                'ordered': []
+                'not_ordered': ['box_plot', 'violin_plot', 'bubble_plot'],
+                'ordered': ['stacked_area_plot', 'line_graph']
             },
             'several_num': {
-                'not_ordered': [],
-                'ordered': []
+                'not_ordered': ['box_plot', 'violin_plot', 'heatmap', 'correlogram'],
+                'ordered': ['stacked_area_plot', 'line_graph']
             }
         },
         'categorical': {
             'one_cat': ['barplot', 'lollipop', 'donut', 'treemap', 'circlepack'],
             'several_cat': {
-                'nested': [],
-                'subgroup': [],
-                'adjacency': []
+                'nested': ['treemap', 'sunburst'],
+                'subgroup': ['grouped_scatterplot', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
+                'adjacency': ['network', 'sankey', 'heatmap']
             }
         }
     }
@@ -73,7 +74,7 @@ def initiate(handler):
     pivot_df = None
     # if len(df.select_dtypes(include=['number']).columns) > 4 or handler.args.pivot == True:
     #     pivot_df = df.pivot()
-    df = df[['c1', 'c2']]
+    df = df[['Continent', 'Stripes', 'c1']]
 
     charts_recommended = recommender(pivot_df or df)
 
@@ -93,15 +94,15 @@ def recommender(df):
         visited_nodes_path.append(key)
 
     while len(queue) > 0:
+        node_visited = queue.pop(0)
         if isinstance(getFromDict(chart_possible, visited_nodes_path), list):   # headsup: you are at leaf node
             charts_recommended.extend(getFromDict(chart_possible, visited_nodes_path))
-            break
+            # break
         else:
-            node_visited = queue.pop(0)
             loc = {}
             exec('loc["next_node"] = '+node_visited+'(df)', globals(), locals())
             queue.append(loc['next_node'])
-            visited_nodes_path.append(loc['next_node'])
+        visited_nodes_path.append(loc['next_node'])
 
     return {'chart_list': charts_recommended}
 
@@ -119,9 +120,9 @@ def coltype_combination(df):
     """
     number_df = df.select_dtypes(exclude=['number'])
     if len(number_df.columns) == 0:
-        return 'categorical'
-    elif len(number_df.columns) == len(df.columns):
         return 'numerical'
+    elif len(number_df.columns) == len(df.columns):
+        return 'categorical'
     else:
         return 'num_and_cat'
 
@@ -135,9 +136,49 @@ def num_and_cat(df):
         return 'several_cat_one_num'
 
 
-def one_num_one_cat(df):
+def numerical(df):
+    if len(df.columns) == 1:
+        return 'one_num'
+    elif len(df.columns) == 2:
+        return 'two_num'
+    elif len(df.columns) == 3:
+        return 'three_num'
+    return 'several_num'
 
+
+def categorical(df):
+    return 'one_cat' if len(df.columns) == 1 else 'several_cat'
+
+
+def two_num(df):
+    return 'ordered' if ordered(df) else 'not_ordered'
+
+
+def three_num(df):
+    return 'ordered' if ordered(df) else 'not_ordered'
+
+
+def several_num(df):
+    return 'ordered' if ordered(df) else 'not_ordered'
+
+
+def one_num_one_cat(df):
     return 'one_obs_per_group' if one_obs_per_group(df) else 'several_obs_per_group'
+
+
+def several_cat_one_num(df):
+    cat_cols = df.select_dtypes(exclude=['number'])
+    if len(cat_cols) == 2 and df[cat_cols[0]].unique().sort() == df[cat_cols[1]].unique().sort():
+        return 'adjacency'
+    return 'subgroup'
+
+
+def several_cat(df):
+    print(df[df.columns[0]].unique(), df[df.columns[1]].unique())
+    if len(df.columns) == 2 and df[df.columns[0]].unique().sort() == df[df.columns[1]].unique().sort():
+        return 'adjacency'
+    else:
+        return 'subgroup'
 
 
 def one_obs_per_group(df):
@@ -174,17 +215,17 @@ def ordered(df):
 
 
 def not_ordered(df):
+    if len(df.columns) == 2:
+        return 'few_points' if len(df) < 2000 else 'many_points'
     return not ordered(df)
 
 
 def subgroup(df):
-
-    return ''
+    return 'one_obs_per_group' if one_obs_per_group(df) else 'several_obs_per_group'
 
 
 def nested(df):
-
-    return ''
+    return 'one_obs_per_group' if one_obs_per_group(df) else 'several_obs_per_group'
 
 
 def group_type(categorical_cols):
