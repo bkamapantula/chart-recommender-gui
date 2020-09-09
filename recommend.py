@@ -1,34 +1,36 @@
-import gramex
 import operator
+import logging
 import numpy as np
-import pandas as pd
 from functools import reduce  # forward compatibility for Python 3
+import gramex.cache
 
-
-def getFromDict(dataDict, mapList):
-    print(mapList)
-    return reduce(operator.getitem, mapList, dataDict)
-
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
+DATA_LENGTH = 2000
 
 chart_possible = {
     'coltype_combination':
     {
         'num_and_cat': {
             'one_num_one_cat': {
-                'one_obs_per_group': ['lollipop', 'bar_plot', 'circular_bar_plot', 'treemap', 'circlepack'],
+                'one_obs_per_group':
+                    ['lollipop', 'bar_plot', 'circular_bar_plot', 'treemap', 'circlepack'],
                 'several_obs_per_group': ['box_plot', 'violin_plot']
             },
-            'one_cat_several_num': { # NOTE: Could not understand rationale behind no_order, a_num_is_ordered in data-to-viz.com
-                'one_value_per_group': ['multi_line', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
+            'one_cat_several_num': {
+                'one_value_per_group':
+                    ['multi_line', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
                 'multiple_values_per_group': ['grouped_scatterplot']
             },
             'several_cat_one_num': {
                 'subgroup': {
-                    'one_obs_per_group': ['multi_line', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
+                    'one_obs_per_group':
+                        ['multi_line', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
                     'several_obs_per_group': ['box_plot', 'violin_plot']
                 },
                 'nested': {
-                    'one_obs_per_group': ['lollipop', 'bar_plot', 'circular_bar_plot', 'treemap', 'circlepack'],
+                    'one_obs_per_group':
+                        ['lollipop', 'bar_plot', 'circular_bar_plot', 'treemap', 'circlepack'],
                     'several_obs_per_group': ['box_plot', 'violin_plot']
                 },
                 'adjacency': ['network', 'sankey', 'chord', 'arc']
@@ -56,7 +58,8 @@ chart_possible = {
             'one_cat': ['barplot', 'lollipop', 'donut', 'treemap', 'circlepack'],
             'several_cat': {
                 'nested': ['treemap', 'sunburst'],
-                'subgroup': ['grouped_scatterplot', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
+                'subgroup':
+                    ['grouped_scatterplot', 'parallel_plot', 'stacked_bar_plot', 'grouped_bar_plot'],
                 'adjacency': ['network', 'sankey', 'heatmap']
             }
         }
@@ -64,25 +67,40 @@ chart_possible = {
 }
 
 
+def get_from_dict(data_dict, map_list):
+    return reduce(operator.getitem, map_list, data_dict)
+
+
 def initiate(handler):
+    """Setup chart recommendation workflow
 
-    # dataframe must have at least one column in it. TODO: Tejesh to write a null check
-    df = gramex.cache.open('flags.xlsx')
-    print(df.head())
+    Args:
+        handler (object): tornado request object
 
+    Returns:
+        charts_recommended (json): list of recommended charts against `chart_list` key
+    """
+    # TODO: write a null check on dataframe. It should have at least one column.
+    df = gramex.cache.open('data.xlsx')
 
     pivot_df = None
     # if len(df.select_dtypes(include=['number']).columns) > 4 or handler.args.pivot == True:
     #     pivot_df = df.pivot()
-    df = df[['Continent', 'Stripes', 'c1']]
+    df = df[['ID', 'c1']]
 
     charts_recommended = recommender(pivot_df or df)
-
     return charts_recommended
 
 
-
 def recommender(df):
+    """Recommend charts for a given pandas dataframe
+
+    Args:
+        df (pandas dataframe): pandas dataframe for the given data file
+
+    Returns:
+        (json): list of charts recommended mapped against `chart_list` key
+    """
     # BFS but will go further down only if certain condition is possible
     # So, a node is pushed to the BFS
     queue = []
@@ -95,8 +113,9 @@ def recommender(df):
 
     while len(queue) > 0:
         node_visited = queue.pop(0)
-        if isinstance(getFromDict(chart_possible, visited_nodes_path), list):   # headsup: you are at leaf node
-            charts_recommended.extend(getFromDict(chart_possible, visited_nodes_path))
+        if isinstance(get_from_dict(chart_possible, visited_nodes_path), list):
+            # headsup: you are at leaf node
+            charts_recommended.extend(get_from_dict(chart_possible, visited_nodes_path))
             # break
         else:
             loc = {}
@@ -111,7 +130,7 @@ def coltype_combination(df):
     """returns combination for column types
         https://stackoverflow.com/a/29803297
 
-    Arguments:
+    Args:
         fields_names {list} -- Field names and
         type_map {dict} -- dictionary of field names and its corresponding dtypes
 
@@ -174,8 +193,16 @@ def several_cat_one_num(df):
 
 
 def several_cat(df):
-    print(df[df.columns[0]].unique(), df[df.columns[1]].unique())
-    if len(df.columns) == 2 and df[df.columns[0]].unique().sort() == df[df.columns[1]].unique().sort():
+    """Multiple categorical columns
+
+    Args:
+        df (dataframe): pandas dataframe
+
+    Returns:
+        (str): adjacency or a subgroup
+    """
+    if len(df.columns) == 2 and \
+        df[df.columns[0]].unique().sort() == df[df.columns[1]].unique().sort():
         return 'adjacency'
     else:
         return 'subgroup'
@@ -205,7 +232,7 @@ def ordered(df):
 
     # Alternate solution?: https://stackoverflow.com/a/17705498
 
-    Arguments:
+    Args:
         df {dataframe} -- Expects a dataframe which contains **only numerical columns**
 
     Returns:
@@ -216,7 +243,7 @@ def ordered(df):
 
 def not_ordered(df):
     if len(df.columns) == 2:
-        return 'few_points' if len(df) < 2000 else 'many_points'
+        return 'few_points' if len(df) < DATA_LENGTH else 'many_points'
     return not ordered(df)
 
 
@@ -231,20 +258,23 @@ def nested(df):
 def group_type(categorical_cols):
     """if multiple categorical cols chosen, this function is called.
 
-    Arguments:
+    Args:
         categorical_cols {[type]} -- [description]
     """
-    return "t1"
+    raise NotImplementedError
 
 
 def group_item_type(categorical_col):
     """[summary]
 
-    Arguments:
+    Args:
         categorical_col {[type]} -- [description]
 
     Returns:
         [type] -- [description]
     """
+    raise NotImplementedError
 
-    return "h11"
+
+if __name__ == "__main__":
+    logging.debug(initiate(''))

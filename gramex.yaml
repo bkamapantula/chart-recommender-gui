@@ -30,7 +30,7 @@ url:
     pattern: /$YAMLURL/initiate
     handler: FunctionHandler
     kwargs:
-      function: recochar.initiate
+      function: recommend.initiate
 
 
 
