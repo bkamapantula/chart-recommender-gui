@@ -76,12 +76,51 @@ Here is the list of all possible chart recommendations:
 - treemap
 - violin plot
 
+# Usage
+
 ## Application setup
 
 - [Install Gramex 1.x](https://learn.gramener.com/guide/install/)
 - Clone this repository
 - From the repo folder, run `gramex setup .`
 - From the repo folder, run `gramex`
+
+## Command-line interface (CLI)
+
+Run `recommend.py`
+
+```bash
+python recommend.py
+```
+
+This uses `data.xlsx` file and recommends few charts as an output:
+
+```bash
+{'chart_list': ['lollipop', 'bar_plot', 'circular_bar_plot', 'treemap', 'circlepack']}
+```
+
+It runs `initiate()` function which uses two columns `ID` (categorical column with unique observations/values) and `c1` (numeric column) to recommend charts.
+
+## As a service
+
+```py
+import recommend
+
+recommend.initiate('')
+```
+
+# TODO
+
+## CLI tool
+
+- [ ] Accept Google spreadsheet URL as input
+- [ ] Accept local data file as input
+- [ ] Accept a subset of columns
+
+## Standalone tool
+
+- [ ] On running Gramex, provide an option to input a spreadsheet URL
+- [ ] Recommend charts subsequently
 
 ## Contributions
 
